@@ -15,6 +15,7 @@ The generated sets are: rules (every rule-table entry in context), fuzz
 
 Usage:
   python -I tools/dump_goldens.py --out tests/goldens/syllables.jsonl.gz \\
+      --modules-out tests/goldens/modules.jsonl.gz \\
       --gold-sample ... --tests-dir ... --lexicon ... --gold-tsv-dir ...
 """
 import argparse
