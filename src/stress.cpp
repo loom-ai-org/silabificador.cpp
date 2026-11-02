@@ -12,7 +12,7 @@
 // stress domains. A pre-1990 grave (sòmente) marks a secondary stress outright.
 //
 // References: Cunha & Cintra (1984), "Acentuação" and "Monossílabos átonos";
-// Acordo Ortográfico (1990), Bases VIII-XI and Base IX §9.
+// Acordo Ortográfico (1990), Bases VIII-XI and Base XIII 1.º.
 #include <array>
 #include <stdexcept>
 

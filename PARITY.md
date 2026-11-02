@@ -80,13 +80,13 @@ with arguments that `analyze` never produces. The test `modules` checks it.
 
 | Call | Cases | Arguments |
 | --- | ---: | --- |
-| `nucleus.resolve` | 40,000 | random units, including empty and multi-letter vowel texts; start and end from -10 to 10 |
+| `nucleus.resolve` | 40,004 | random units, including empty and multi-letter vowel texts; start and end from -10 to 10; four fixed cases whose nucleus test wraps a negative index |
 | `Syllable.of` | 30,000 | random units; a nucleus that may be empty, negative, descending or absent |
 | `stress.assign` | 20,000 | random syllables with empty and separator-only surfaces; compound words |
 | `stress.stressed_index` | 20,000 | random syllable strings and words, IndexError cases included |
 | `morphology.boundaries` | 20,000 | real and random words against units that do not match them |
 | `parser.parse`, `graphemes.tokenize` | 10,000 each | mixed-case raw strings |
-| `phonotactics.is_vowel`, `is_complex_onset` | 54 each | unit texts, every complex onset, and odd strings |
+| `phonotactics.is_vowel`, `is_complex_onset` | 68 each | unit texts, every complex onset, and odd strings |
 | UTF-8 decoding through `graphemes.tokenize` | 95,536 | every two-byte string, plus seeded strings over the lead and continuation boundary bytes |
 
 To regenerate, install the reference release in a fresh virtual environment, then
@@ -94,6 +94,7 @@ run:
 
 ```
 python -I tools/dump_goldens.py --out tests/goldens/syllables.jsonl.gz \
+    --modules-out tests/goldens/modules.jsonl.gz \
     --gold-sample <silabificador>/tests/gold_sample.json \
     --tests-dir <silabificador>/tests \
     --lexicon <site-packages>/tugalex/data/regional_dict.csv.gz \

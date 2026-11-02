@@ -47,6 +47,10 @@ int main() {
     expect(fe[0].length(), size_t{2}, "Syllable length counts code points");
     expect(sb::graphemes::tokenize("chá")[0].length(), size_t{2}, "Grapheme length of a digraph");
     expect(sb::graphemes::tokenize("chá")[1].str(), std::string("á"), "Grapheme str");
+    expect(sb::graphemes::tokenize("chá")[1].length(), size_t{1}, "Grapheme length counts code points");
+    expect(sb::code_points("\x80"), size_t{1}, "a lone continuation byte is one U+FFFD");
+    expect(sb::code_points("\xED\xA0\x80"), size_t{3}, "a surrogate encoding is three U+FFFD");
+    expect(sb::code_points("\xF0\x9F\x98"), size_t{1}, "a truncated sequence is one U+FFFD");
 
     const sb::Syllabifier syllabifier;
     expect(syllabifier.syllabify("rainha"), Strings{"ra", "i", "nha"}, "Syllabifier.syllabify");

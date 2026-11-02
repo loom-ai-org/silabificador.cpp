@@ -54,6 +54,18 @@ char32_t lower_sigma(const U32& text, size_t i) {
 // Python's bytes.decode("utf-8", "replace"): each maximal subpart of an
 // ill-formed sequence becomes one U+FFFD, and the byte that breaks a sequence
 // is not consumed, so it starts the next one.
+U32 from_utf8(std::string_view text);
+
+}  // namespace silabificador::detail
+
+namespace silabificador {
+
+size_t code_points(std::string_view text) { return detail::from_utf8(text).size(); }
+
+}  // namespace silabificador
+
+namespace silabificador::detail {
+
 U32 from_utf8(std::string_view text) {
     U32 out;
     out.reserve(text.size());

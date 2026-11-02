@@ -2,7 +2,8 @@
 //
 // C++ port of the Python package of the same name. Every public function takes
 // and returns UTF-8; the rules work on Unicode code points internally, exactly
-// as the Python code indexes `str`. Invalid UTF-8 input bytes decode to U+FFFD.
+// as the Python code indexes `str`. Ill-formed UTF-8 decodes as Python's
+// bytes.decode("utf-8", "replace"): one U+FFFD per maximal subpart.
 #pragma once
 
 #include <set>
@@ -12,12 +13,8 @@
 
 namespace silabificador {
 
-// Number of Unicode code points in a UTF-8 string: Python's len() of the str.
-inline size_t code_points(std::string_view text) {
-    size_t count = 0;
-    for (unsigned char c : text) count += (c & 0xC0) != 0x80;
-    return count;
-}
+// Number of code points the UTF-8 text decodes to: Python's len() of the str.
+size_t code_points(std::string_view text);
 
 // The Python release this port is held at byte parity with.
 inline constexpr const char* kPythonReference = "2.1.1a2";

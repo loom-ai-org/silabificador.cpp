@@ -31,7 +31,7 @@ import unicodedata
 
 import silabificador
 from silabificador import graphemes, morphology, nucleus, parser, phonotactics, stress
-from silabificador.graphemes import Grapheme
+from silabificador.graphemes import CONSONANT, SEPARATOR, VOWEL, Grapheme
 from silabificador.syllable import Syllable
 
 
@@ -77,6 +77,13 @@ def module_records(seed):
     def word():
         return "".join(rng.choice(WORD_PARTS) for _ in range(rng.randint(0, 5)))
 
+    # Negative start and end whose nucleus test must wrap the index past the
+    # first unit; random draws rarely build this case.
+    wrap = [Grapheme("ã", SEPARATOR), Grapheme("ç", CONSONANT), Grapheme("U", CONSONANT),
+            Grapheme("", CONSONANT), Grapheme("eoiu", CONSONANT), Grapheme("i", VOWEL),
+            Grapheme("z", CONSONANT)]
+    for start, end in ((-7, -2), (-7, -1), (-6, -2), (-5, -1)):
+        yield ["resolve", plain(wrap), start, end, guarded(lambda: nucleus.resolve(wrap, start, end))]
     for _ in range(40000):
         us = units()
         start, end = rng.randint(-10, 10), rng.randint(-10, 10)
