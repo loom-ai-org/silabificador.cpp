@@ -6,7 +6,6 @@
 // much of its right edge as Portuguese licenses; the rest stays in the coda
 // (a.tle.ta, pac.to, car.ro, abs.tra.ir). Morpheme boundaries and separators
 // outrank it.
-#include <algorithm>
 
 #include "detail.hpp"
 #include "phonotactics.hpp"
@@ -68,31 +67,29 @@ Syllable syllable_of(const std::vector<Unit>& units, const nucleus::Group* nucle
         return syllable;
     }
 
-    // `nucleus` holds indices into the word; rebase them onto `units`.
-    const int base = nucleus->at(0);
-    int offset = 0;
+    // `nucleus` holds indices into the word; rebase them onto `units`. Indexing
+    // and slicing follow Python, so a caller's negative or descending nucleus
+    // wraps exactly as it does there.
+    const long base = py_at(*nucleus, 0);
+    long offset = 0;
     for (size_t i = 0; i < units.size(); ++i) {
         if (units[i].is_vowel()) {
-            offset = static_cast<int>(i);
+            offset = static_cast<long>(i);
             break;
         }
     }
-    std::vector<int> vowels;
+    std::vector<long> vowels;
     for (int index : *nucleus) vowels.push_back(offset + (index - base));
 
-    const int head = vowels.front();
-    const int tail = vowels.back();
-    // Python slices clamp; at() below still rejects an out-of-range nucleus.
-    const size_t onset_end = std::min<size_t>(static_cast<size_t>(std::max(head, 0)), units.size());
+    const long head = vowels.front();
+    const long tail = vowels.back();
+    const size_t onset_end = py_bound(head, units.size());
+    const size_t coda_start = py_bound(tail + 1, units.size());
 
     U32 onset, coda, glide_off, separator;
     for (size_t i = 0; i < onset_end; ++i) onset += units[i].text;
-    for (size_t i = static_cast<size_t>(std::max(tail + 1, 0)); i < units.size(); ++i) {
+    for (size_t i = coda_start; i < units.size(); ++i) {
         if (!units[i].is_separator()) coda += units[i].text;
-    }
-    for (size_t k = 1; k < vowels.size(); ++k) glide_off += units.at(vowels[k]).text;
-    for (const auto& unit : units) {
-        if (unit.is_separator()) separator += unit.text;
     }
 
     // The glide of qu/gu is spelled inside the onset consonant itself.
@@ -101,8 +98,14 @@ Syllable syllable_of(const std::vector<Unit>& units, const nucleus::Group* nucle
         if (last == U"qu" || last == U"gu") syllable.glide_on = "u";
     }
 
+    const U32& nucleus_text = py_at(units, head).text;
+    for (size_t k = 1; k < vowels.size(); ++k) glide_off += py_at(units, vowels[k]).text;
+    for (const auto& unit : units) {
+        if (unit.is_separator()) separator += unit.text;
+    }
+
     syllable.onset = to_utf8(onset);
-    syllable.nucleus = to_utf8(units.at(head).text);
+    syllable.nucleus = to_utf8(nucleus_text);
     syllable.glide_off = to_utf8(glide_off);
     syllable.coda = to_utf8(coda);
     syllable.separator = to_utf8(separator);

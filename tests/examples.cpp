@@ -43,6 +43,11 @@ int main() {
     expect(compound[0].secondary, true, "guarda-chuva secondary stress");
     expect(compound[2].stressed, true, "guarda-chuva primary stress");
 
+    const auto fe = sb::analyze("fé");
+    expect(fe[0].length(), size_t{2}, "Syllable length counts code points");
+    expect(sb::graphemes::tokenize("chá")[0].length(), size_t{2}, "Grapheme length of a digraph");
+    expect(sb::graphemes::tokenize("chá")[1].str(), std::string("á"), "Grapheme str");
+
     const sb::Syllabifier syllabifier;
     expect(syllabifier.syllabify("rainha"), Strings{"ra", "i", "nha"}, "Syllabifier.syllabify");
     expect(syllabifier.stressed_index("rainha"), 1, "Syllabifier.stressed_index");

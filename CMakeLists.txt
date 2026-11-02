@@ -65,6 +65,10 @@ if(SILABIFICADOR_BUILD_TESTS)
     target_link_libraries(silabificador_parity PRIVATE silabificador ZLIB::ZLIB)
     add_test(NAME parity COMMAND silabificador_parity ${CMAKE_CURRENT_SOURCE_DIR}/tests/goldens)
 
+    add_executable(silabificador_modules tests/modules.cpp)
+    target_link_libraries(silabificador_modules PRIVATE silabificador ZLIB::ZLIB)
+    add_test(NAME modules COMMAND silabificador_modules ${CMAKE_CURRENT_SOURCE_DIR}/tests/goldens)
+
     add_executable(silabificador_examples tests/examples.cpp)
     target_link_libraries(silabificador_examples PRIVATE silabificador)
     add_test(NAME examples COMMAND silabificador_examples)

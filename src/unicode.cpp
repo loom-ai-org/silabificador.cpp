@@ -51,49 +51,56 @@ char32_t lower_sigma(const U32& text, size_t i) {
 }
 }  // namespace
 
+// Python's bytes.decode("utf-8", "replace"): each maximal subpart of an
+// ill-formed sequence becomes one U+FFFD, and the byte that breaks a sequence
+// is not consumed, so it starts the next one.
 U32 from_utf8(std::string_view text) {
     U32 out;
     out.reserve(text.size());
-    size_t i = 0;
     const size_t n = text.size();
     auto byte = [&](size_t k) { return static_cast<unsigned char>(text[k]); };
+    size_t i = 0;
     while (i < n) {
-        unsigned char b = byte(i);
-        char32_t cp;
-        size_t len;
+        const unsigned char b = byte(i);
         if (b < 0x80) {
-            cp = b;
-            len = 1;
-        } else if ((b & 0xE0) == 0xC0) {
+            out.push_back(b);
+            ++i;
+            continue;
+        }
+        size_t need;
+        char32_t cp;
+        unsigned char lower = 0x80, upper = 0xBF;
+        if (b >= 0xC2 && b <= 0xDF) {
+            need = 1;
             cp = b & 0x1F;
-            len = 2;
-        } else if ((b & 0xF0) == 0xE0) {
+        } else if (b >= 0xE0 && b <= 0xEF) {
+            need = 2;
             cp = b & 0x0F;
-            len = 3;
-        } else if ((b & 0xF8) == 0xF0) {
+            if (b == 0xE0) lower = 0xA0;
+            if (b == 0xED) upper = 0x9F;
+        } else if (b >= 0xF0 && b <= 0xF4) {
+            need = 3;
             cp = b & 0x07;
-            len = 4;
+            if (b == 0xF0) lower = 0x90;
+            if (b == 0xF4) upper = 0x8F;
         } else {
             out.push_back(0xFFFD);
             ++i;
             continue;
         }
-        bool ok = i + len <= n;
-        for (size_t k = 1; ok && k < len; ++k) {
-            if ((byte(i + k) & 0xC0) != 0x80) {
-                ok = false;
-            } else {
-                cp = (cp << 6) | (byte(i + k) & 0x3F);
+        size_t j = i + 1;
+        bool complete = true;
+        for (size_t k = 0; k < need; ++k, ++j) {
+            if (j >= n || byte(j) < lower || byte(j) > upper) {
+                complete = false;
+                break;
             }
+            cp = (cp << 6) | (byte(j) & 0x3F);
+            lower = 0x80;
+            upper = 0xBF;
         }
-        static constexpr char32_t kMin[] = {0, 0, 0x80, 0x800, 0x10000};
-        if (!ok || cp < kMin[len] || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) {
-            out.push_back(0xFFFD);
-            ++i;
-            continue;
-        }
-        out.push_back(cp);
-        i += len;
+        out.push_back(complete ? cp : 0xFFFD);
+        i = j;
     }
     return out;
 }

@@ -12,6 +12,13 @@
 
 namespace silabificador {
 
+// Number of Unicode code points in a UTF-8 string: Python's len() of the str.
+inline size_t code_points(std::string_view text) {
+    size_t count = 0;
+    for (unsigned char c : text) count += (c & 0xC0) != 0x80;
+    return count;
+}
+
 // The Python release this port is held at byte parity with.
 inline constexpr const char* kPythonReference = "2.1.1a2";
 
@@ -31,7 +38,8 @@ struct Syllable {
     bool stressed = false;   // primary stress; exactly one syllable of a word
     bool secondary = false;  // secondary stress, only in compounds or with a grave
 
-    const std::string& str() const { return surface; }
+    const std::string& str() const { return surface; }        // Python __str__
+    size_t length() const { return code_points(surface); }      // Python __len__
     bool operator==(const Syllable& other) const;
 };
 
@@ -79,6 +87,8 @@ struct Grapheme {
     bool is_vowel() const { return kind == Kind::Vowel; }
     bool is_consonant() const { return kind == Kind::Consonant; }
     bool is_separator() const { return kind == Kind::Separator; }
+    const std::string& str() const { return text; }        // Python __str__
+    size_t length() const { return code_points(text); }    // Python __len__
     bool operator==(const Grapheme& other) const {
         return text == other.text && kind == other.kind;
     }

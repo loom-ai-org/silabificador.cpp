@@ -118,6 +118,65 @@ inline std::vector<std::string> read_gz_lines(const std::string& path) {
     return lines;
 }
 
+// A parsed JSON value: enough for the golden files (no floats, no objects).
+struct Value {
+    enum class Kind { Null, Bool, Int, String, Array } kind = Kind::Null;
+    bool boolean = false;
+    long integer = 0;
+    std::string string;
+    std::vector<Value> items;
+
+    const Value& operator[](size_t i) const { return items.at(i); }
+    bool is_null() const { return kind == Kind::Null; }
+};
+
+inline Value parse_value(const std::string& line, size_t& pos) {
+    Value v;
+    const char c = line.at(pos);
+    if (c == '"') {
+        v.kind = Value::Kind::String;
+        v.string = unquote(line, pos);
+    } else if (c == '[') {
+        v.kind = Value::Kind::Array;
+        ++pos;
+        if (line.at(pos) == ']') {
+            ++pos;
+            return v;
+        }
+        while (true) {
+            v.items.push_back(parse_value(line, pos));
+            if (line.at(pos) == ',') {
+                ++pos;
+            } else if (line.at(pos) == ']') {
+                ++pos;
+                return v;
+            } else {
+                throw std::runtime_error("bad array at " + std::to_string(pos));
+            }
+        }
+    } else if (line.compare(pos, 4, "true") == 0) {
+        v.kind = Value::Kind::Bool;
+        v.boolean = true;
+        pos += 4;
+    } else if (line.compare(pos, 5, "false") == 0) {
+        v.kind = Value::Kind::Bool;
+        pos += 5;
+    } else if (line.compare(pos, 4, "null") == 0) {
+        pos += 4;
+    } else {
+        size_t used = 0;
+        v.kind = Value::Kind::Int;
+        v.integer = std::stol(line.substr(pos, 24), &used);
+        pos += used;
+    }
+    return v;
+}
+
+inline Value parse(const std::string& line) {
+    size_t pos = 0;
+    return parse_value(line, pos);
+}
+
 // The leading "count" of a golden header line such as {"...","count":87091}.
 inline long header_count(const std::string& header) {
     size_t at = header.rfind("\"count\":");

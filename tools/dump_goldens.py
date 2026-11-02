@@ -30,11 +30,103 @@ import sys
 import unicodedata
 
 import silabificador
-from silabificador import graphemes, morphology, phonotactics, stress
+from silabificador import graphemes, morphology, nucleus, parser, phonotactics, stress
+from silabificador.graphemes import Grapheme
+from silabificador.syllable import Syllable
 
 
 def dumps(value):
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+
+
+def syllable_fields(s):
+    return [s.onset, s.glide_on, s.nucleus, s.glide_off, s.coda, s.separator, s.surface,
+            s.stressed, s.secondary]
+
+
+def guarded(call):
+    try:
+        return call()
+    except IndexError:
+        return "IndexError"
+
+
+UNIT_TEXTS = ["a", "e", "i", "o", "u", "y", "ã", "õ", "í", "ú", "iu", "eo", "oi", "",
+              "n", "nh", "r", "rr", "s", "l", "z", "m", "x", "qu", "gu", "ch", "-", " ", "'"]
+KINDS = [graphemes.VOWEL, graphemes.CONSONANT, graphemes.SEPARATOR]
+SURFACES = ["ca", "sa", "da-", "chu", "va", "", "-", " ", "de ", "pé", "mó", "ção", "dòr",
+            "xis", "a o", "vos-", "fa", "lam", "jo", "vens", "ír"]
+WORD_PARTS = ["ca", "sa", "-", " ", "de", "vos", "a", "chu", "va", "pé", "", "lam", "ens", "'"]
+DECODE_BYTES = [0x41, 0x61, 0x7F, 0x80, 0x8F, 0x90, 0x9F, 0xA0, 0xAC, 0xBF, 0xC0, 0xC1, 0xC2,
+                0xC3, 0xA7, 0xDF, 0xE0, 0xE2, 0x82, 0xED, 0xEF, 0xF0, 0xF4, 0xF5, 0xFF, 0x2D]
+
+
+def module_records(seed):
+    """Every sub-module function, called with arguments built here rather than
+    produced by analyze(): odd units, empty texts, negative and descending
+    indices, empty surfaces, and invalid UTF-8."""
+    rng = random.Random(seed)
+
+    def units(max_len=8):
+        return [Grapheme(rng.choice(UNIT_TEXTS), rng.choice(KINDS))
+                for _ in range(rng.randint(0, max_len))]
+
+    def plain(us):
+        return [[u.text, u.kind] for u in us]
+
+    def word():
+        return "".join(rng.choice(WORD_PARTS) for _ in range(rng.randint(0, 5)))
+
+    for _ in range(40000):
+        us = units()
+        start, end = rng.randint(-10, 10), rng.randint(-10, 10)
+        yield ["resolve", plain(us), start, end, guarded(lambda: nucleus.resolve(us, start, end))]
+    for _ in range(30000):
+        us = units()
+        group = None if rng.random() < 0.1 else [rng.randint(-8, 8) for _ in range(rng.randint(0, 4))]
+        yield ["syllable_of", plain(us), group,
+               guarded(lambda: syllable_fields(Syllable.of(us, nucleus=group)))]
+    for _ in range(20000):
+        syllables = [Syllable(surface=rng.choice(SURFACES), onset=rng.choice(SURFACES),
+                              stressed=rng.random() < 0.5, secondary=rng.random() < 0.5)
+                     for _ in range(rng.randint(0, 5))]
+        w = word()
+        yield ["assign", [syllable_fields(s) for s in syllables], w,
+               [syllable_fields(s) for s in stress.assign(syllables, w)]]
+    for _ in range(20000):
+        strings = [rng.choice(SURFACES) for _ in range(rng.randint(0, 5))]
+        w = word()
+        yield ["stressed_index", strings, w, guarded(lambda: stress.stressed_index(strings, w))]
+    for _ in range(20000):
+        us, w = units(), rng.choice(["subliminar", "distribuidor", "sublocar", "abrogar",
+                                     "adligar", "juiz", "ajuizar", "possuir", word()])
+        yield ["boundaries", w, plain(us), sorted(morphology.boundaries(w, us))]
+    for _ in range(10000):
+        w = "".join(rng.choice("AbcÇÉqgu- ’aeiouãõíúnhlrs") for _ in range(rng.randint(0, 10)))
+        yield ["parse", w, [syllable_fields(s) for s in parser.parse(w)]]
+        yield ["tokenize", w, plain(graphemes.tokenize(w))]
+    for text in sorted(set(UNIT_TEXTS + SURFACES + sorted(phonotactics.COMPLEX_ONSETS)
+                           + ["A", "Á", "pl", "plr", "aa", "ç"])):
+        yield ["is_vowel", text, phonotactics.is_vowel(text)]
+        yield ["is_complex_onset", text, phonotactics.is_complex_onset(text)]
+    # Decoding: every byte pair, then seeded longer strings over the boundary bytes.
+    for first in range(256):
+        for second in range(256):
+            data = bytes([first, second])
+            yield ["decode", data.hex(), plain(graphemes.tokenize(data.decode("utf-8", "replace")))]
+    for _ in range(30000):
+        data = bytes(rng.choice(DECODE_BYTES) for _ in range(rng.randint(1, 10)))
+        yield ["decode", data.hex(), plain(graphemes.tokenize(data.decode("utf-8", "replace")))]
+
+
+def write_gz(path, header, lines):
+    buffer = io.StringIO()
+    buffer.write(dumps(header) + "\n")
+    for line in lines:
+        buffer.write(line + "\n")
+    with open(path, "wb") as raw:
+        with gzip.GzipFile(fileobj=raw, mode="wb", mtime=0, filename="") as handle:
+            handle.write(buffer.getvalue().encode("utf-8"))
 
 
 def record(word):
@@ -139,14 +231,15 @@ def unicode_words():
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--out", required=True)
-    parser.add_argument("--gold-sample")
-    parser.add_argument("--tests-dir")
-    parser.add_argument("--lexicon")
-    parser.add_argument("--gold-tsv-dir")
-    parser.add_argument("--fuzz", type=int, default=30000)
-    args = parser.parse_args()
+    cli = argparse.ArgumentParser()
+    cli.add_argument("--out", required=True)
+    cli.add_argument("--gold-sample")
+    cli.add_argument("--tests-dir")
+    cli.add_argument("--lexicon")
+    cli.add_argument("--gold-tsv-dir")
+    cli.add_argument("--modules-out", required=True)
+    cli.add_argument("--fuzz", type=int, default=30000)
+    args = cli.parse_args()
 
     corpora = {}
     if args.gold_sample:
@@ -171,17 +264,14 @@ def main():
                 inputs.append(word)
         print(f"{name}: {len(words)} in, {len(inputs) - before} new", file=sys.stderr)
 
-    versions = {name: importlib.metadata.version(name) for name in ("silabificador",)}
-    buffer = io.StringIO()
-    buffer.write(dumps({"versions": versions, "python": sys.version.split()[0],
-                        "unicode": unicodedata.unidata_version, "count": len(inputs)}) + "\n")
-    for word in inputs:
-        buffer.write(dumps(record(word)) + "\n")
-
-    with open(args.out, "wb") as raw:
-        with gzip.GzipFile(fileobj=raw, mode="wb", mtime=0, filename="") as handle:
-            handle.write(buffer.getvalue().encode("utf-8"))
+    header = {"versions": {"silabificador": importlib.metadata.version("silabificador")},
+              "python": sys.version.split()[0], "unicode": unicodedata.unidata_version}
+    write_gz(args.out, dict(header, count=len(inputs)), (dumps(record(word)) for word in inputs))
     print(f"total: {len(inputs)} in, {len(inputs)} out -> {args.out}", file=sys.stderr)
+
+    modules = [dumps(line) for line in module_records(seed=20261103)]
+    write_gz(args.modules_out, dict(header, count=len(modules)), modules)
+    print(f"modules: {len(modules)} out -> {args.modules_out}", file=sys.stderr)
 
 
 if __name__ == "__main__":

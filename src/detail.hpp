@@ -4,6 +4,7 @@
 #pragma once
 
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -25,6 +26,24 @@ U32 py_lower(const U32& text);
 bool contains(std::u32string_view set, char32_t c);
 bool ends_with(std::u32string_view text, std::u32string_view suffix);
 bool starts_with(std::u32string_view text, std::u32string_view prefix);
+
+// Python list indexing: a negative index counts from the end, and an index out
+// of range raises (IndexError there, std::out_of_range here).
+template <typename Vector>
+const typename Vector::value_type& py_at(const Vector& items, long index) {
+    const long n = static_cast<long>(items.size());
+    if (index < 0) index += n;
+    if (index < 0 || index >= n) throw std::out_of_range("list index out of range");
+    return items[static_cast<size_t>(index)];
+}
+
+// Python slice-bound normalization: a negative bound counts from the end, and
+// the result is clamped into [0, n].
+inline size_t py_bound(long index, size_t n) {
+    const long size = static_cast<long>(n);
+    if (index < 0) index = index + size < 0 ? 0 : index + size;
+    return static_cast<size_t>(index > size ? size : index);
+}
 
 struct Unit {
     U32 text;
