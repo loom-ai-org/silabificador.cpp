@@ -22,5 +22,6 @@ inline constexpr std::u32string_view kLiquids = U"lr";
 inline constexpr std::u32string_view kHiatusCodas = U"lmnrz";
 
 bool is_complex_onset(std::u32string_view cluster);
+bool has_foreign_mark(std::u32string_view word);
 
 }  // namespace silabificador::phonotactics

@@ -55,6 +55,61 @@ std::vector<nucleus::Group> split_group(const nucleus::Group& group, const std::
     pieces.push_back(std::move(current));
     return pieces;
 }
+
+// Place every consonant around the nuclei in `groups`.
+std::vector<Syllable> assemble(const std::vector<Unit>& units, const std::vector<nucleus::Group>& groups,
+                               const std::set<int>& hard) {
+    const int last_unit = static_cast<int>(units.size()) - 1;
+    std::vector<Syllable> syllables;
+    int start = 0;  // first unit not yet placed
+    for (size_t position = 0; position < groups.size(); ++position) {
+        const nucleus::Group& group = groups[position];
+        int end;
+        if (position + 1 == groups.size()) {
+            end = last_unit;  // the last syllable takes every remaining coda
+        } else {
+            const int next = groups[position + 1].front();
+            std::vector<int> separators;
+            std::vector<const Unit*> cluster;
+            std::vector<int> cluster_index;
+            for (int i = group.back() + 1; i < next; ++i) {
+                if (units[i].is_separator()) separators.push_back(i);
+                if (units[i].is_consonant()) {
+                    cluster.push_back(&units[i]);
+                    cluster_index.push_back(i);
+                }
+            }
+            int crossing = -1;
+            for (int i : hard) {
+                if (group.back() < i && i <= next) {
+                    crossing = i;  // std::set iterates ascending: this is the minimum
+                    break;
+                }
+            }
+
+            if (crossing >= 0) {
+                // A morpheme boundary outranks onset maximization: sub.li.mi.nar.
+                end = crossing - 1;
+            } else if (!separators.empty()) {
+                // A separator is a hard boundary: ab-.re.a.gir, not a.b-re.a.gir.
+                end = separators.back();
+            } else if (cluster.empty()) {
+                end = group.back();
+            } else {
+                const size_t onset = onset_size(cluster);
+                end = onset < cluster.size() ? cluster_index[cluster.size() - onset - 1] : group.back();
+            }
+        }
+
+        // A separator belongs to the syllable it follows: guar.da-.chu.va.
+        while (end + 1 <= last_unit && units[end + 1].is_separator()) ++end;
+
+        std::vector<Unit> slice(units.begin() + start, units.begin() + end + 1);
+        syllables.push_back(syllable_of(slice, &group));
+        start = end + 1;
+    }
+    return syllables;
+}
 }  // namespace
 
 Syllable syllable_of(const std::vector<Unit>& units, const nucleus::Group* nucleus) {
@@ -139,56 +194,15 @@ std::vector<Syllable> parse(const U32& word) {
         return {syllable_of(units, nullptr)};
     }
 
-    const int last_unit = static_cast<int>(units.size()) - 1;
-    std::vector<Syllable> syllables;
-    int start = 0;  // first unit not yet placed
-    for (size_t position = 0; position < groups.size(); ++position) {
-        const nucleus::Group& group = groups[position];
-        int end;
-        if (position + 1 == groups.size()) {
-            end = last_unit;  // the last syllable takes every remaining coda
-        } else {
-            const int next = groups[position + 1].front();
-            std::vector<int> separators;
-            std::vector<const Unit*> cluster;
-            std::vector<int> cluster_index;
-            for (int i = group.back() + 1; i < next; ++i) {
-                if (units[i].is_separator()) separators.push_back(i);
-                if (units[i].is_consonant()) {
-                    cluster.push_back(&units[i]);
-                    cluster_index.push_back(i);
-                }
-            }
-            int crossing = -1;
-            for (int i : hard) {
-                if (group.back() < i && i <= next) {
-                    crossing = i;  // std::set iterates ascending: this is the minimum
-                    break;
-                }
-            }
-
-            if (crossing >= 0) {
-                // A morpheme boundary outranks onset maximization: sub.li.mi.nar.
-                end = crossing - 1;
-            } else if (!separators.empty()) {
-                // A separator is a hard boundary: ab-.re.a.gir, not a.b-re.a.gir.
-                end = separators.back();
-            } else if (cluster.empty()) {
-                end = group.back();
-            } else {
-                const size_t onset = onset_size(cluster);
-                end = onset < cluster.size() ? cluster_index[cluster.size() - onset - 1] : group.back();
-            }
-        }
-
-        // A separator belongs to the syllable it follows: guar.da-.chu.va.
-        while (end + 1 <= last_unit && units[end + 1].is_separator()) ++end;
-
-        std::vector<Unit> slice(units.begin() + start, units.begin() + end + 1);
-        syllables.push_back(syllable_of(slice, &group));
-        start = end + 1;
-    }
-    return syllables;
+    std::vector<Syllable> syllables = assemble(units, groups, hard);
+    // The stress rules read the first pass, and the nucleus rules that depend on
+    // stress regroup it. The regrouping never moves the stress: it only touches
+    // a syllable that is not stressed, or a final one that stays stressed.
+    std::vector<bool> stressed;
+    for (const auto& syllable : assign(syllables, word)) stressed.push_back(syllable.stressed || syllable.secondary);
+    const std::vector<nucleus::Group> regrouped = by_stress(units, groups, stressed, hard);
+    if (regrouped == groups) return syllables;
+    return assemble(units, regrouped, hard);
 }
 
 }  // namespace detail

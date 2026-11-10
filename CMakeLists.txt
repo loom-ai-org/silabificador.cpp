@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(silabificador VERSION 2.1.1 LANGUAGES CXX)
+project(silabificador VERSION 2.1.7 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -12,6 +12,17 @@ else()
     set(_silabificador_top OFF)
 endif()
 option(SILABIFICADOR_BUILD_TESTS "Build the parity and unit tests" ${_silabificador_top})
+
+# data/stems.csv is the Python package's file, copied verbatim. The library
+# embeds it, so an installed library reads no file at run time.
+set(_silabificador_stems "${CMAKE_CURRENT_SOURCE_DIR}/data/stems.csv")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_silabificador_stems}")
+file(READ "${_silabificador_stems}" SILABIFICADOR_STEMS_CSV)
+string(FIND "${SILABIFICADOR_STEMS_CSV}" ")stems_csv" _silabificador_delimiter)
+if(NOT _silabificador_delimiter EQUAL -1)
+    message(FATAL_ERROR "data/stems.csv holds the raw-string delimiter )stems_csv")
+endif()
+configure_file(src/stems_csv.inc.in "${CMAKE_CURRENT_BINARY_DIR}/generated/stems_csv.inc" @ONLY)
 
 add_library(silabificador
     src/unicode.cpp
@@ -30,6 +41,7 @@ target_include_directories(silabificador
         $<INSTALL_INTERFACE:include>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 set_target_properties(silabificador PROPERTIES POSITION_INDEPENDENT_CODE ON)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")

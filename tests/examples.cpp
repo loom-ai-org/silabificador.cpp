@@ -35,6 +35,31 @@ int main() {
     expect(sb::syllabify("distribuidor"), Strings{"dis", "tri", "bu", "i", "dor"}, "stem seam");
     expect(sb::syllabify(""), Strings{}, "empty word");
 
+    expect(sb::syllabify("fluiu"), Strings{"flu", "iu"}, "STRESSED-IU-UI");
+    expect(sb::syllabify("distraiu"), Strings{"dis", "tra", "iu"}, "STRESSED-IU-UI after a");
+    expect(sb::syllabify("pauis"), Strings{"pa", "uis"}, "STRESSED-IU-UI before s");
+    expect(sb::syllabify("baiuca"), Strings{"bai", "u", "ca"}, "a paroxytone keeps its diphthong");
+    expect(sb::syllabify("miudeza"), Strings{"mi", "u", "de", "za"}, "UNSTRESSED-IU");
+    expect(sb::syllabify("cuidado"), Strings{"cui", "da", "do"}, "UNSTRESSED-IU leaves ui alone");
+    expect(sb::syllabify("mãinha"), Strings{"mã", "i", "nha"}, "PRE-PALATAL outranks NASAL-OFFGLIDE");
+    expect(sb::syllabify("xiita"), Strings{"xi", "i", "ta"}, "IDENTICAL-VOWELS");
+    expect(sb::syllabify("sublinhar"), Strings{"sub", "li", "nhar"}, "sub + linh");
+    expect(sb::syllabify("arduidade"), Strings{"ar", "du", "i", "da", "de"}, "-uo adjective before -idade");
+    expect(sb::syllabify("contiguidade"), Strings{"con", "ti", "gui", "da", "de"}, "gu before -idade");
+    expect(sb::syllabify("arruinado"), Strings{"ar", "ru", "i", "na", "do"}, "listed stem ru.in");
+    expect(sb::syllabify("bureau"), Strings{"bu", "reau"}, "French eau");
+    expect(sb::syllabify("boxeur"), Strings{"bo", "xeur"}, "French eu before a final r");
+    expect(sb::syllabify("gourmet"), Strings{"gour", "met"}, "ou in a foreign word");
+    expect(sb::syllabify("agüentar"), Strings{"a", "güen", "tar"}, "the trema u is in the onset");
+    expect(sb::syllabify("kubitschek"), Strings{"ku", "bi", "tschek"}, "German tsch");
+    expect(sb::syllabify("graffiti"), Strings{"graf", "fi", "ti"}, "a doubled ff splits");
+    expect(sb::syllabify("guizhou"), Strings{"gui", "zhou"}, "pinyin zh");
+    expect(sb::phonotactics::has_foreign_mark("gourmet"), true, "has_foreign_mark(gourmet)");
+    expect(sb::phonotactics::has_foreign_mark("casa"), false, "has_foreign_mark(casa)");
+    expect(sb::phonotactics::is_foreign_tetragraph("tsch"), true, "is_foreign_tetragraph(tsch)");
+    expect(sb::phonotactics::is_foreign_digraph("ff"), false, "ff is not a foreign digraph");
+
+    expect(sb::stressed_index(""), 0, "an empty word returns 0");
     expect(sb::stressed_index("computador"), 3, "computador stress");
     expect(sb::stressed_index("casa"), 0, "casa stress");
     expect(sb::stressed_index("sílaba"), 0, "sílaba stress");

@@ -68,19 +68,53 @@ int main(int argc, char** argv) {
         return 1;
     }
     const long expected = json_line::header_count(lines[0]);
+    const std::string version = json_line::header_version(lines[0]);
+    const bool version_ok = version == sb::kPythonReference;
+    if (!version_ok) {
+        std::cerr << "goldens are from silabificador " << version << ", the port names "
+                  << sb::kPythonReference << "\n";
+    }
+
+    // Lines are grouped by corpus in header order; a header without corpora
+    // counts every line under one name.
+    auto corpora = json_line::header_corpora(lines[0]);
+    if (corpora.empty()) corpora.emplace_back("all", expected);
+    long owned = 0;
+    for (const auto& corpus : corpora) owned += corpus.second;
+
     long checked = 0, mismatches = 0;
+    size_t corpus = 0;
+    long corpus_left = corpora[0].second, corpus_mismatches = 0;
+    auto close_corpus = [&] {
+        std::cout << "  " << corpora[corpus].first << ": " << corpora[corpus].second << " lines, "
+                  << corpus_mismatches << " mismatches\n";
+        corpus_mismatches = 0;
+    };
     for (size_t i = 1; i < lines.size(); ++i) {
+        while (corpus_left == 0 && corpus + 1 < corpora.size()) {
+            close_corpus();
+            corpus_left = corpora[++corpus].second;
+        }
+        --corpus_left;
         size_t pos = 1;  // past the opening '['
         const std::string word = json_line::unquote(lines[i], pos);
         const std::string got = record(word);
         ++checked;
         if (got != lines[i]) {
+            ++corpus_mismatches;
             if (++mismatches <= 20) {
                 std::cerr << "MISMATCH\n  python: " << lines[i] << "\n  c++:    " << got << "\n";
             }
         }
     }
+    while (corpus < corpora.size()) {
+        close_corpus();
+        ++corpus;
+    }
     std::cout << "goldens: " << expected << " in, " << checked << " checked, " << mismatches
               << " mismatches\n";
-    return (checked == expected && mismatches == 0) ? 0 : 1;
+    // A short, empty or mislabelled golden fails as surely as a wrong line.
+    const bool counts_ok = expected > 0 && checked == expected && owned == expected;
+    if (!counts_ok) std::cerr << "golden count check failed\n";
+    return (version_ok && counts_ok && mismatches == 0) ? 0 : 1;
 }

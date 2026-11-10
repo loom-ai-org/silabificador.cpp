@@ -55,6 +55,9 @@ struct Unit {
 
 std::vector<Unit> tokenize(const U32& word);
 std::vector<nucleus::Group> resolve(const std::vector<Unit>& units, int start, int end);
+std::vector<nucleus::Group> by_stress(const std::vector<Unit>& units,
+                                      const std::vector<nucleus::Group>& groups,
+                                      const std::vector<bool>& stressed, const std::set<int>& hard);
 std::set<int> boundaries(const U32& word, const std::vector<Unit>& units);
 Syllable syllable_of(const std::vector<Unit>& units, const nucleus::Group* nucleus);
 std::vector<Syllable> parse(const U32& word);
