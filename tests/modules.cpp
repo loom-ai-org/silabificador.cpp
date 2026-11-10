@@ -188,6 +188,7 @@ std::string replay(const Value& v) {
             {"FOREIGN_TETRAGRAPHS", sb::phonotactics::is_foreign_tetragraph},
             {"HIATUS_BEFORE", sb::phonotactics::is_hiatus_before},
             {"HIATUS_CODAS", sb::phonotactics::is_hiatus_coda},
+            {"AO_DIPHTHONG_WORDS", sb::phonotactics::is_ao_diphthong_word},
         };
         const auto predicate = predicates.find(v[1].string);
         if (predicate == predicates.end()) throw std::runtime_error("unknown table " + v[1].string);

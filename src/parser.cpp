@@ -73,7 +73,10 @@ std::vector<Syllable> assemble(const std::vector<Unit>& units, const std::vector
             std::vector<const Unit*> cluster;
             std::vector<int> cluster_index;
             for (int i = group.back() + 1; i < next; ++i) {
-                if (units[i].is_separator()) separators.push_back(i);
+                // An apostrophe is not a boundary: it marks an elided vowel (AO90
+                // Base XVIII 1), so the consonant before it is the onset of the
+                // next vowel: pau-.d'a.lho, san.t'a.na.
+                if (units[i].is_separator() && !in_apostrophes(units[i].text)) separators.push_back(i);
                 if (units[i].is_consonant()) {
                     cluster.push_back(&units[i]);
                     cluster_index.push_back(i);
@@ -91,7 +94,7 @@ std::vector<Syllable> assemble(const std::vector<Unit>& units, const std::vector
                 // A morpheme boundary outranks onset maximization: sub.li.mi.nar.
                 end = crossing - 1;
             } else if (!separators.empty()) {
-                // A separator is a hard boundary: ab-.re.a.gir, not a.b-re.a.gir.
+                // A hyphen or a space is a hard boundary: ab-.re.a.gir, not a.b-re.a.gir.
                 end = separators.back();
             } else if (cluster.empty()) {
                 end = group.back();
@@ -101,7 +104,8 @@ std::vector<Syllable> assemble(const std::vector<Unit>& units, const std::vector
             }
         }
 
-        // A separator belongs to the syllable it follows: guar.da-.chu.va.
+        // A hyphen, space or apostrophe belongs to the syllable it follows:
+        // guar.da-.chu.va.
         while (end + 1 <= last_unit && units[end + 1].is_separator()) ++end;
 
         std::vector<Unit> slice(units.begin() + start, units.begin() + end + 1);
@@ -141,17 +145,20 @@ Syllable syllable_of(const std::vector<Unit>& units, const nucleus::Group* nucle
     const size_t onset_end = py_bound(head, units.size());
     const size_t coda_start = py_bound(tail + 1, units.size());
 
+    // The onset leaves out an apostrophe: the d of d'á is the onset.
     U32 onset, coda, glide_off, separator;
-    for (size_t i = 0; i < onset_end; ++i) onset += units[i].text;
+    const U32* last_onset = nullptr;
+    for (size_t i = 0; i < onset_end; ++i) {
+        if (in_apostrophes(units[i].text)) continue;
+        onset += units[i].text;
+        last_onset = &units[i].text;
+    }
     for (size_t i = coda_start; i < units.size(); ++i) {
         if (!units[i].is_separator()) coda += units[i].text;
     }
 
     // The glide of qu/gu is spelled inside the onset consonant itself.
-    if (onset_end > 0) {
-        const U32& last = units[onset_end - 1].text;
-        if (last == U"qu" || last == U"gu") syllable.glide_on = "u";
-    }
+    if (last_onset != nullptr && (*last_onset == U"qu" || *last_onset == U"gu")) syllable.glide_on = "u";
 
     const U32& nucleus_text = py_at(units, head).text;
     for (size_t k = 1; k < vowels.size(); ++k) glide_off += py_at(units, vowels[k]).text;

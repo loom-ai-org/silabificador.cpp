@@ -24,6 +24,14 @@ U32 py_strip(const U32& text);
 U32 py_lower(const U32& text);
 
 bool contains(std::u32string_view set, char32_t c);
+
+// The separators that mark an elided vowel rather than end a word: pau-d'alho,
+// Sant'Ana.
+inline constexpr std::u32string_view kApostrophes = U"'’";
+// Python's `text in APOSTROPHES`: a substring test, so "" is in it too.
+inline bool in_apostrophes(std::u32string_view text) {
+    return kApostrophes.find(text) != std::u32string_view::npos;
+}
 bool ends_with(std::u32string_view text, std::u32string_view suffix);
 bool starts_with(std::u32string_view text, std::u32string_view prefix);
 

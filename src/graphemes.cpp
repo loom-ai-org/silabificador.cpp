@@ -32,9 +32,11 @@ bool u_is_mute(const U32& word, size_t index) {
 // in its donor language, anchored on a context no Portuguese word has: French
 // eau at the end of a word or before a final s/x (bu.reau, bor.deaux), French
 // eu before a final r (bo.xeur), and ou in a word with a foreign mark
-// (gour.met, coun.try).
+// (gour.met, coun.try). A word ends at a separator, so the end of each element
+// of a compound counts: beaux-.arts, as bor.deaux (AO90 Base XV 1).
 std::u32string_view foreign_vowel(const U32& word, size_t index) {
-    const std::u32string_view rest = std::u32string_view(word).substr(index);
+    std::u32string_view rest = std::u32string_view(word).substr(index);
+    rest = rest.substr(0, rest.find_first_of(kSeparators));
     if (starts_with(rest, U"eau")) {
         const std::u32string_view tail = rest.substr(3);
         if (tail.empty() || tail == U"s" || tail == U"x") return U"eau";

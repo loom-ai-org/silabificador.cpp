@@ -12,7 +12,10 @@ Corpora (all optional except the rules, fuzz and unicode sets, which are generat
   --gold-tsv-dir  tugaphone tests/data/gold (every word column)
 
 The generated sets are: rules (every rule-table entry in context), fuzz
-(seeded random strings) and unicode (case-mapping and whitespace probes).
+(seeded random strings), unicode (case-mapping and whitespace probes), and the
+phrase sets: clitics, enclitics, contractions, elisions, phrases and pairs. The
+phrase sets join words with hyphens, spaces and apostrophes, and draw their base
+words from the corpora above.
 
 Usage:
   python -I tools/dump_goldens.py --out tests/goldens/syllables.jsonl.gz \\
@@ -28,6 +31,7 @@ import io
 import json
 import pathlib
 import random
+import re
 import sys
 import unicodedata
 
@@ -82,13 +86,29 @@ NEWLINE_PROBES = [head + "ou" + final + end
     for end in ("", "\n", "\n\n", " ")]
 PHONOTACTIC_TABLES = ("VOWELS", "GLIDE_CAPABLE", "STRESS_MARKED", "NASAL_VOWELS", "CONSONANTS",
                       "CONSONANT_DIGRAPHS", "FOREIGN_DIGRAPHS", "FOREIGN_TETRAGRAPHS",
-                      "HIATUS_BEFORE", "HIATUS_CODAS")
+                      "HIATUS_BEFORE", "HIATUS_CODAS", "AO_DIPHTHONG_WORDS")
 MARK_PROBES = [head + mark + tail
                for mark in ("k", "w", "y", "ä", "ö", "ü", "ë", "ck", "sch", "sh", "th", "ph", "tz",
                             "eau", "b", "c", "d", "g", "t", "ch", "K", "c h", "e au", "x", "")
                for head in ("", "a")
                for tail in ("", "a", "\n", "\n\n", "s", " ")]
 TOKENIZE_ALPHABET = "aeiouüäöëykwbcdghnprstxzç- eauour" + "\n"
+WORD_EDGE_TEXTS = ["a", "o", "ao", "s", "i", "u", "iu", "e", "eau", "d", "qu", "gu", "",
+                   "-", " ", "'", "’", "'’", "x", "lh"]
+WORD_EDGE_WORDS = ["ao", "aos", "ao pé", "aos pés", "ao-pé", "pé-ao", "d'ao", "d'aos", "ao'",
+                   "'ao", "ao’s", "a o", "a os", "caos", "aorta", "x ao", "ao x", "ao-ao",
+                   "saiu-se", "saiu se", "saiu's", "saiu’s", "saius-se", "saiu-s", "distraiu-o",
+                   "contribuiu-lhe", "atribuiu-se-lhe", "pauis-x", "pauis x", "caiu d'água",
+                   "caiu-o d'água", "abaiuca-se", "viu-se", "beaux-arts", "beaux arts",
+                   "chauffeur-chefe", "bureau-x", "eau-de", "pau-d'água", "sant'ana",
+                   "bê-á-'bá", "três pa'anga", "deu-te-lo", "dar-te-ei", "no-lo"]
+CLITIC_SURFACES = ["dá-", "lo", "-", "te-", "lo-", "ei", "d'", "'á", "’", "'", "ven", "deu-", "se",
+                   "pau-", "d'á", "gua", "a ", "ao ", "no-", "vo-", "", "s'", "-'", "á-'", "lhe",
+                   "frei ", "às ", "mo", "ca", "sa", "pé-", " ", "m'o", "nos-", "nas"]
+CLITIC_WORD_PARTS = ["dá", "lo", "-", " ", "'", "’", "te", "se", "ei", "deu", "no", "vo", "pau",
+                     "d", "água", "a", "ao", "casa", "frei", "", "lhe", "mo", "nas", "pelos", "à",
+                     "um"]
+WORD_EDGE_ALPHABET = "aaooeiusdrlx- '’" + "\n"
 DECODE_BYTES = [0x41, 0x61, 0x7F, 0x80, 0x8F, 0x90, 0x9F, 0xA0, 0xAC, 0xBF, 0xC0, 0xC1, 0xC2,
                 0xC3, 0xA7, 0xDF, 0xE0, 0xE2, 0x82, 0xED, 0xEF, 0xF0, 0xF4, 0xF5, 0xFF, 0x2D]
 
@@ -208,6 +228,68 @@ def module_records(seed):
             yield ["table", name, text, text in table]
     for w in sorted(set(STEM_PROBES + NEWLINE_PROBES + MARK_PROBES)):
         yield ["has_foreign_mark", w, phonotactics.FOREIGN_MARKS.search(w) is not None]
+
+    # Separators that end a word and apostrophes that do not: the stressed iu scan,
+    # the contraction ao, the elided onset and the enclitic host. These calls draw
+    # from their own generator, so the calls above keep their arguments.
+    rng = random.Random(seed + 2)
+    for _ in range(20000):
+        us = [Grapheme(rng.choice(WORD_EDGE_TEXTS), rng.choice(KINDS))
+              for _ in range(rng.randint(0, 8))]
+        start, end = rng.randint(-9, 9), rng.randint(-9, 9)
+        yield ["resolve", plain(us), start, end, guarded(lambda: nucleus.resolve(us, start, end))]
+    for w in WORD_EDGE_WORDS:
+        us = graphemes.tokenize(w)
+        for run in parser._split_runs(us):
+            yield ["resolve", plain(us), run[0], run[-1],
+                   guarded(lambda: nucleus.resolve(us, run[0], run[-1]))]
+    for _ in range(20000):
+        us = [Grapheme(rng.choice(BY_STRESS_TEXTS + ["'", "’", " "]), rng.choice(KINDS))
+              for _ in range(rng.randint(0, 8))]
+        groups = [[rng.randint(-9, 9) for _ in range(rng.choice((0, 1, 1, 1, 2, 2, 3)))]
+                  for _ in range(rng.randint(0, 5))]
+        stressed = [rng.random() < 0.5 for _ in range(rng.randint(0, 6))]
+        hard = sorted({rng.randint(-9, 9) for _ in range(rng.choice((0, 0, 1, 2)))})
+        yield ["by_stress", plain(us), groups, stressed, hard,
+               guarded(lambda: nucleus.by_stress(us, groups, stressed, set(hard)))]
+    for w in WORD_EDGE_WORDS:
+        us = graphemes.tokenize(w)
+        hard = morphology.boundaries(w, us)
+        groups = [g for run in parser._split_runs(us)
+                  for g in nucleus.resolve(us, run[0], run[-1])]
+        for stressed in ([True] * len(groups), [False] * len(groups),
+                         [k == len(groups) - 1 for k in range(len(groups))]):
+            yield ["by_stress", plain(us), groups, stressed, sorted(hard),
+                   guarded(lambda: nucleus.by_stress(us, groups, stressed, hard))]
+    for _ in range(20000):
+        us = [Grapheme(rng.choice(WORD_EDGE_TEXTS), rng.choice(KINDS))
+              for _ in range(rng.randint(0, 8))]
+        group = None if rng.random() < 0.1 else [rng.randint(-8, 8) for _ in range(rng.randint(0, 4))]
+        yield ["syllable_of", plain(us), group,
+               guarded(lambda: syllable_fields(Syllable.of(us, nucleus=group)))]
+    for _ in range(20000):
+        syllables = [Syllable(surface=rng.choice(CLITIC_SURFACES), onset=rng.choice(CLITIC_SURFACES),
+                              stressed=rng.random() < 0.5, secondary=rng.random() < 0.5)
+                     for _ in range(rng.randint(0, 6))]
+        w = "".join(rng.choice(CLITIC_WORD_PARTS) for _ in range(rng.randint(0, 6)))
+        yield ["assign", [syllable_fields(s) for s in syllables], w,
+               [syllable_fields(s) for s in stress.assign(syllables, w)]]
+    for _ in range(20000):
+        strings = [rng.choice(CLITIC_SURFACES) for _ in range(rng.randint(0, 6))]
+        w = "".join(rng.choice(CLITIC_WORD_PARTS) for _ in range(rng.randint(0, 6)))
+        yield ["stressed_index", strings, w, guarded(lambda: stress.stressed_index(strings, w))]
+    # Well-formed assign and stressed_index calls: the first-pass syllables of
+    # real phrases against their own spelling.
+    for w in WORD_EDGE_WORDS:
+        syllables = parser.parse(w)
+        yield ["assign", [syllable_fields(s) for s in syllables], w,
+               [syllable_fields(s) for s in stress.assign(syllables, w)]]
+        strings = [str(s) for s in syllables]
+        yield ["stressed_index", strings, w, guarded(lambda: stress.stressed_index(strings, w))]
+    for _ in range(20000):
+        w = "".join(rng.choice(WORD_EDGE_ALPHABET) for _ in range(rng.randint(0, 12)))
+        yield ["tokenize", w, plain(graphemes.tokenize(w))]
+        yield ["parse", w, [syllable_fields(s) for s in parser.parse(w)]]
 
 
 def write_gz(path, header, lines):
@@ -353,6 +435,120 @@ def rule_words_2_1_7():
                 yield head + pair + tail
 
 
+PRONOUN_ENDINGS = ("ei", "ás", "á", "emos", "eis", "ão", "ia", "ias", "íamos", "íeis", "iam")
+MESOCLITIC_PRONOUNS = ("me", "te", "se", "lhe", "nos", "vos", "lhes", "mo", "lho", "vo-lo")
+PHRASES = (
+    # Compounds and phrases with an unstressed word or a hyphenated pronoun.
+    "guarda-chuva", "bem-te-vi", "arco-íris", "bem-me-quer", "mal-me-quer", "guarda-redes",
+    "pé-de-meia", "chapéu de chuva", "pão de ló", "trás-os-montes", "tête-à-tête", "dia-a-dia",
+    "cara-a-cara", "à-vontade", "à toa", "à-toa", "aqui del-rei", "aqui d'el-rei", "à-d'el-rei",
+    "el-rei", "trinta-e-um", "vinte-e-um", "diz-que-diz-que", "nem-nem", "palmeira-dum",
+    "no-lo", "vo-lo", "pelos campos", "pelas ruas", "pelo caminho", "pela estrada",
+    "às vezes", "ao pé", "aos poucos", "num dia", "nuns dias", "dum lado", "duns tantos",
+    "sob a ponte", "frei luís", "frei tomé", "dom pedro", "são paulo", "seu joão",
+    "cada um", "mais uma", "capítulo um", "ei-lo", "eis-me", "eis-nos",
+    "para-brisas", "para-choques", "para-raios", "para-sol", "mãe-d'água", "pau-d'alho",
+    "revelou-m'o", "confiamos n'o que nos salvou", "pel'a que é nossa", "d'os lusíadas",
+    "esse milagre revelou-m'o", "dá-se", "deixa-o", "partir-lhe", "amá-lo-ei",
+    "enviar-lhe-emos", "fá-lo-ás", "habitá-la-iam", "trá-la-á", "atraí-lo", "atraí-lo-ia",
+    "possuí-la", "possuí-la-ia", "fazem-no", "faze-lo", "fazemo-lo", "fazei-lo",
+    "quere-o", "requere-o", "dar-vo-la-ia", "mostrou-vo-los", "limpei-lha",
+    "entregar-mos", "diga-me o preço do livro", "vejo-te", "fala-se", "dá-me o livro",
+    # The contractions ao and aos, and ao inside a word.
+    "ao", "aos", "Ao", "AOS", "aos pés", "ao deus-dará", "ao passo que", "ao-pé",
+    "vou ao cinema", "dei-o aos pais", "a os", "a o", "a Os Lusíadas", "a O que tudo pode",
+    "d'aos", "'ao", "ao'", "ao  pé", "ao.", "aos,", "caos", "aorta", "maometano", "aonde",
+    "macau", "cacau", "caetano", "são-caetano", "daos", "naos", "kaos", "tao", "macao",
+    "ao-ao", "aos-aos", "ao ao", "pão ao forno", "àquele", "à", "às", "ao’", "d’aos",
+    # The elided vowel of d', n', sant' and the U+2019 apostrophe.
+    "pau-d'água", "estrela-d'alva", "lobo-d'alsácia", "copo d'água", "caiu d'água",
+    "caiu-o d'água", "caiu n'água", "saiu d'aqui", "saiu-se-lhe d'aqui", "sant'ana",
+    "nun'álvares", "castanha-d’água", "caiu d’água", "pau-d’água", "pa'anga", "bahá'í",
+    "três pa'anga", "bê-á-'bá", "bê-á-’bá", "enguia-d’água-doce", "d’os lusíadas",
+    "copo d' água", "d'", "'", "’", "d'-", "-d'", "x'-y", "a'-'a", "cd-rom",
+    # The stressed iu or ui before a separator, and the loanword vowels before one.
+    "saiu-se", "caiu-lhe", "saiu-lhes", "distraiu-se", "distraiu-o", "atraiu-nos",
+    "instruiu-os", "possuiu-a", "contribuiu-lhe", "atribuiu-se-lhe", "saiu de casa",
+    "abaiuca-se", "amiudá-lo", "viu-se", "partiu-se", "distraí-lo", "pauis-me", "pauis de",
+    "beaux-arts", "beaux arts", "chauffeur-chefe", "bureau-chefe", "boxeur-x", "eau-de-vie",
+    "bordeaux'x", "beaux’arts",
+)
+
+
+def phrase_corpora(corpora):
+    """Words joined by hyphens, spaces and apostrophes. The base words are the
+    plain words (no separator) of the corpora already read, so the phrase sets
+    grow with the lexicon; a seeded generator picks the samples."""
+    rng = random.Random(20261110)
+    bases = sorted({w.lower() for name in ("gold_sample", "edge_cases", "lexicon", "gold_tsv")
+                    for w in corpora.get(name, ())
+                    if w and not any(c in w for c in "- '’\n\t\r")})
+    pronouns = sorted(stress.CLITIC_PRONOUNS)
+
+    def sample(words, count):
+        return sorted(rng.sample(words, min(count, len(words))))
+
+    def lo_stem(infinitive):
+        stem, vowel = infinitive[:-2], infinitive[-2]
+        if vowel == "a":
+            return stem + "á"
+        if vowel == "e":
+            return stem + "ê"
+        return stem + ("í" if stem[-1:] in "aeiou" else "i")
+
+    clitics = []
+    for clitic in sorted(stress.CLITICS):
+        for template in ("{0} casa", "casa {0}", "{0} casa-chuva", "vende-{0}", "vendeu-{0}",
+                         "fazem-{0}", "dar-{0}-ei", "vende-{0}-lo", "{0}-lo", "{0}-{0}", "{0}'casa",
+                         "d'{0}", "casa d'{0}", "{0} {0} casa", "saiu-{0}", "pauis-{0}",
+                         "casa-{0}", "{0}-casa", "dá-{0}", "deu-te-{0}"):
+            clitics.append(template.format(clitic))
+
+    infinitives = [w for w in bases if re.fullmatch(r"[a-zà-ü]+(ar|er|ir)", w)]
+    preterites = [w for w in bases if re.fullmatch(r"[a-zà-ü]{2,}(ou|eu|iu)", w)]
+    nasal = [w for w in bases if re.fullmatch(r"[a-zà-ü]{2,}(am|em|ão|õe)", w)]
+    falling = [w for w in bases if re.search(r"[aeiouáéíóúâêôãõ](iu|ui|íu|uí)s?$", w)]
+    enclitics = []
+    for w in sample(infinitives, 300):
+        enclitics += [f"{w}-{p}" for p in pronouns]
+        enclitics += [f"{lo_stem(w)}-{p}" for p in ("lo", "la", "los", "las")]
+    for w in sample(preterites, 300):
+        enclitics += [f"{w}-{p}" for p in pronouns]
+        enclitics += [f"{w}-me-lo", f"{w}-vo-lo", f"{w}-to-las"]
+    for w in sample(nasal, 150):
+        enclitics += [f"{w}-{p}" for p in ("no", "na", "nos", "nas")]
+    for w in sample(infinitives, 100):
+        for ending in PRONOUN_ENDINGS:
+            enclitics += [f"{w}-{p}-{ending}" for p in MESOCLITIC_PRONOUNS]
+            enclitics.append(f"{lo_stem(w)}-lo-{ending}")
+    for w in falling:
+        enclitics += [f"{w}{tail}" for tail in ("-se", "-lhe", "-o", "-se-lhe", " de casa", " se",
+                                                "'s", "’s", "-x", " d'água", "s-se")]
+
+    contractions = []
+    for w in sample(bases, 1500):
+        contractions += [f"ao {w}", f"aos {w}", f"{w} ao", f"{w}-ao", f"ao-{w}",
+                         f"dei-o aos {w}", f"d'ao {w}", f"{w} ao {w}"]
+
+    elisions = []
+    for w in sample(bases, 1500):
+        elisions += [f"{w} d'água", f"{w}-d'alho", f"{w}-se-lhe d'aqui", f"{w} d’água",
+                     f"{w} d' água"]
+        if w[:1] in "aeiouáéíóúâêôãõà":
+            elisions += [f"pau-d'{w}", f"caiu n'{w}", f"sant'{w}", f"d'{w}", f"d’{w}",
+                         f"{w}-d'{w}"]
+
+    pairs, tails = [], bases + pronouns
+    for _ in range(20000):
+        pairs.append(rng.choice(bases) + rng.choice(("-", " ", "'", "’")) + rng.choice(bases))
+    for _ in range(5000):
+        pairs.append(rng.choice(bases) + rng.choice(("-", " ", "'")) + rng.choice(pronouns)
+                     + rng.choice(("-", " ", "'")) + rng.choice(tails))
+
+    return {"clitics": clitics, "enclitics": enclitics, "contractions": contractions,
+            "elisions": elisions, "phrases": list(PHRASES), "pairs": pairs}
+
+
 def fuzz_words(count, seed):
     rng = random.Random(seed)
     for _ in range(count):
@@ -401,6 +597,7 @@ def main():
     corpora["rules"] = list(rule_words())
     corpora["fuzz"] = list(fuzz_words(args.fuzz, seed=20261102))
     corpora["unicode"] = list(unicode_words())
+    corpora.update(phrase_corpora(corpora))
 
     # Each input is written once, under the first corpus that holds it. The
     # header lists the corpora in file order with the number of lines each owns,
