@@ -3,8 +3,10 @@
 // negative and descending indices, empty surfaces, and invalid UTF-8.
 #include <iostream>
 #include <map>
+#include <set>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 
 #include "json_line.hpp"
 #include "silabificador/silabificador.hpp"
@@ -102,6 +104,36 @@ std::string replay(const Value& v) {
                    return out + "]";
                }) + "]";
     }
+    if (name == "by_stress") {
+        const auto units = units_of(v[1]);
+        std::vector<sb::nucleus::Group> groups;
+        std::string groups_text = "[";
+        for (size_t i = 0; i < v[2].items.size(); ++i) {
+            sb::nucleus::Group group;
+            for (const auto& item : v[2][i].items) group.push_back(static_cast<int>(item.integer));
+            groups.push_back(group);
+            groups_text += (i ? "," : "") + ints_json(group);
+        }
+        std::vector<bool> stressed;
+        std::string stressed_text = "[";
+        for (size_t i = 0; i < v[3].items.size(); ++i) {
+            stressed.push_back(v[3][i].boolean);
+            stressed_text += std::string(i ? "," : "") + boolean(stressed.back());
+        }
+        std::set<int> hard;
+        std::vector<int> hard_list;
+        for (const auto& item : v[4].items) {
+            hard.insert(static_cast<int>(item.integer));
+            hard_list.push_back(static_cast<int>(item.integer));
+        }
+        return head + units_json(units) + "," + groups_text + "]," + stressed_text + "]," + ints_json(hard_list) +
+               "," + guarded([&] {
+                   std::string out = "[";
+                   const auto regrouped = sb::nucleus::by_stress(units, groups, stressed, hard);
+                   for (size_t i = 0; i < regrouped.size(); ++i) out += (i ? "," : "") + ints_json(regrouped[i]);
+                   return out + "]";
+               }) + "]";
+    }
     if (name == "syllable_of") {
         const auto units = units_of(v[1]);
         std::vector<int> group;
@@ -144,6 +176,27 @@ std::string replay(const Value& v) {
     if (name == "is_complex_onset") {
         return head + quote(v[1].string) + "," + boolean(sb::phonotactics::is_complex_onset(v[1].string)) + "]";
     }
+    if (name == "table") {
+        static const std::map<std::string, bool (*)(std::string_view)> predicates{
+            {"VOWELS", sb::phonotactics::is_vowel},
+            {"GLIDE_CAPABLE", sb::phonotactics::is_glide_capable},
+            {"STRESS_MARKED", sb::phonotactics::is_stress_marked},
+            {"NASAL_VOWELS", sb::phonotactics::is_nasal_vowel},
+            {"CONSONANTS", sb::phonotactics::is_consonant},
+            {"CONSONANT_DIGRAPHS", sb::phonotactics::is_consonant_digraph},
+            {"FOREIGN_DIGRAPHS", sb::phonotactics::is_foreign_digraph},
+            {"FOREIGN_TETRAGRAPHS", sb::phonotactics::is_foreign_tetragraph},
+            {"HIATUS_BEFORE", sb::phonotactics::is_hiatus_before},
+            {"HIATUS_CODAS", sb::phonotactics::is_hiatus_coda},
+        };
+        const auto predicate = predicates.find(v[1].string);
+        if (predicate == predicates.end()) throw std::runtime_error("unknown table " + v[1].string);
+        return head + quote(v[1].string) + "," + quote(v[2].string) + "," +
+               boolean(predicate->second(v[2].string)) + "]";
+    }
+    if (name == "has_foreign_mark") {
+        return head + quote(v[1].string) + "," + boolean(sb::phonotactics::has_foreign_mark(v[1].string)) + "]";
+    }
     if (name == "decode") {
         return head + quote(v[1].string) + "," + units_json(sb::graphemes::tokenize(from_hex(v[1].string))) + "]";
     }
@@ -162,6 +215,12 @@ int main(int argc, char** argv) {
         return 1;
     }
     const long expected = json_line::header_count(lines[0]);
+    const std::string version = json_line::header_version(lines[0]);
+    const bool version_ok = version == sb::kPythonReference;
+    if (!version_ok) {
+        std::cerr << "goldens are from silabificador " << version << ", the port names "
+                  << sb::kPythonReference << "\n";
+    }
     long checked = 0, mismatches = 0;
     std::map<std::string, long> by_call;
     for (size_t i = 1; i < lines.size(); ++i) {
@@ -178,5 +237,8 @@ int main(int argc, char** argv) {
     for (const auto& [name, count] : by_call) std::cout << "  " << name << ": " << count << " mismatches\n";
     std::cout << "module goldens: " << expected << " in, " << checked << " checked, " << mismatches
               << " mismatches\n";
-    return (checked == expected && mismatches == 0) ? 0 : 1;
+    // A short, empty or mislabelled golden fails as surely as a wrong line.
+    const bool counts_ok = expected > 0 && checked == expected;
+    if (!counts_ok) std::cerr << "golden count check failed\n";
+    return (version_ok && counts_ok && mismatches == 0) ? 0 : 1;
 }

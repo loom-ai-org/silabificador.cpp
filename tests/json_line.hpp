@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <zlib.h>
@@ -182,6 +183,27 @@ inline long header_count(const std::string& header) {
     size_t at = header.rfind("\"count\":");
     if (at == std::string::npos) throw std::runtime_error("golden header has no count");
     return std::stol(header.substr(at + 8));
+}
+
+// The silabificador release a golden header names: {"versions":{"silabificador":"2.1.7a1"},...}.
+inline std::string header_version(const std::string& header) {
+    const std::string key = "\"silabificador\":";
+    size_t at = header.find(key);
+    if (at == std::string::npos) throw std::runtime_error("golden header has no silabificador version");
+    size_t pos = at + key.size();
+    return unquote(header, pos);
+}
+
+// The corpora of a golden header, in file order, with the number of lines each
+// owns: "corpora":[["gold_sample",500],...]. Empty when the header has none.
+inline std::vector<std::pair<std::string, long>> header_corpora(const std::string& header) {
+    std::vector<std::pair<std::string, long>> corpora;
+    const std::string key = "\"corpora\":";
+    size_t at = header.find(key);
+    if (at == std::string::npos) return corpora;
+    size_t pos = at + key.size();
+    for (const Value& item : parse_value(header, pos).items) corpora.emplace_back(item[0].string, item[1].integer);
+    return corpora;
 }
 
 }  // namespace json_line

@@ -17,7 +17,7 @@ namespace silabificador {
 size_t code_points(std::string_view text);
 
 // The Python release this port is held at byte parity with.
-inline constexpr const char* kPythonReference = "2.1.1a2";
+inline constexpr const char* kPythonReference = "2.1.7a1";
 
 // One syllable, decomposed into onset, nucleus (with glides) and coda.
 //
@@ -68,6 +68,11 @@ bool is_nasal_vowel(std::string_view unit);
 bool is_consonant(std::string_view unit);
 bool is_consonant_digraph(std::string_view unit);
 bool is_foreign_digraph(std::string_view unit);
+bool is_foreign_tetragraph(std::string_view unit);
+// Python's FOREIGN_MARKS.search(word): the word holds a spelling that marks it
+// as foreign or derived from a foreign name (k, w, y, a trema, ck, sch, th, a
+// final b c d g t or ch, ...).
+bool has_foreign_mark(std::string_view word);
 bool is_complex_onset(std::string_view cluster);
 bool is_hiatus_before(std::string_view unit);
 bool is_hiatus_coda(std::string_view unit);
@@ -103,6 +108,12 @@ using Group = std::vector<int>;  // one nucleus and its offglides, as unit indic
 
 // Group the vowel run units[start..end] into syllable nuclei.
 std::vector<Group> resolve(const std::vector<graphemes::Grapheme>& units, int start, int end);
+
+// Regroup `groups` once stressed[k] says whether group k is stressed. `hard`
+// holds the morpheme boundaries, which no group may straddle.
+std::vector<Group> by_stress(const std::vector<graphemes::Grapheme>& units,
+                             const std::vector<Group>& groups, const std::vector<bool>& stressed,
+                             const std::set<int>& hard);
 }  // namespace nucleus
 
 // Build a syllable from its grapheme units. `nucleus` holds indices into the

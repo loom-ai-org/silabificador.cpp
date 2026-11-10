@@ -20,8 +20,11 @@ The engine works in layers:
 - Spelling becomes grapheme units, and each digraph is decided in context.
 - Vowel runs become nuclei and glides.
 - Consonants are placed by onset maximization, limited by the onset inventory.
-- Prefix and stem boundaries override that placement.
+- Prefix, suffix and stem boundaries override that placement. The stems whose
+  boundaries no rule reaches are in `data/stems.csv`, which the library embeds.
 - Stress is read from the accents and the ending.
+- A second nucleus pass reads the stress: a stressed final iu or ui after a vowel
+  is the diphthong (flu.iu), and an unstressed iu is two nuclei (mi.u.de.za).
 
 Each source file under `src/` matches one Python module and carries its
 references.

@@ -1,0 +1,2 @@
+// data/stems.csv, embedded verbatim by CMake at configure time.
+constexpr std::string_view kStemsCsv = R"stems_csv(@SILABIFICADOR_STEMS_CSV@)stems_csv";
