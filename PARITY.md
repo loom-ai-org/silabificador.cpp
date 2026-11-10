@@ -109,8 +109,8 @@ with arguments that `analyze` never produces. The test `modules` checks it.
 | `phonotactics.FOREIGN_MARKS.search` | 632 | each mark alone and in context, the listed stems, and words that end in a newline |
 | UTF-8 decoding through `graphemes.tokenize` | 95,536 | every two-byte string, plus seeded strings over the lead and continuation boundary bytes |
 
-The calls added for 2.1.7a1 draw from a second seeded generator, so the earlier calls
-keep their arguments. A newline at the end of a word reaches only these sub-module
+The `by_stress`, table and `has_foreign_mark` calls draw from their own seeded
+generator, so they do not change the arguments of the other calls. A newline at the end of a word reaches only these sub-module
 calls, because `analyze` strips it. There, Python's `$` matches before it, and the C++
 code does the same.
 

@@ -218,6 +218,9 @@ def write_gz(path, header, lines):
     with open(path, "wb") as raw:
         with gzip.GzipFile(fileobj=raw, mode="wb", mtime=0, filename="") as handle:
             handle.write(buffer.getvalue().encode("utf-8"))
+    # Count the lines in the file on disk, not in the list that was written.
+    with gzip.open(path, "rt", encoding="utf-8") as handle:
+        return sum(1 for _ in handle) - 1
 
 
 def record(word):
@@ -423,11 +426,11 @@ def main():
     header = {"versions": {"silabificador": installed},
               "python": sys.version.split()[0], "unicode": unicodedata.unidata_version}
     lines = [dumps(record(word)) for word in inputs]
-    write_gz(args.out, dict(header, count=len(lines), corpora=owned), lines)
+    written = write_gz(args.out, dict(header, count=len(lines), corpora=owned), lines)
     for (name, words), (_, new) in zip(corpora.items(), owned):
-        print(f"{name}: {len(words)} in, {new} new, {new} out", file=sys.stderr)
-    print(f"total: {len(inputs)} in, {len(lines)} out -> {args.out}", file=sys.stderr)
-    if len(lines) != len(inputs):
+        print(f"{name}: {len(words)} in, {new} new", file=sys.stderr)
+    print(f"total: {len(inputs)} in, {written} out -> {args.out}", file=sys.stderr)
+    if written != len(inputs):
         sys.exit("short golden file")
 
     modules = [dumps(line) for line in module_records(seed=20261103)]
@@ -435,10 +438,12 @@ def main():
     for line in modules:
         name = line[2:line.index('"', 2)]
         calls[name] = calls.get(name, 0) + 1
-    write_gz(args.modules_out, dict(header, count=len(modules)), modules)
+    written = write_gz(args.modules_out, dict(header, count=len(modules)), modules)
     for name, count in calls.items():
-        print(f"modules {name}: {count} out", file=sys.stderr)
-    print(f"modules: {len(modules)} out -> {args.modules_out}", file=sys.stderr)
+        print(f"modules {name}: {count} calls", file=sys.stderr)
+    print(f"modules: {len(modules)} in, {written} out -> {args.modules_out}", file=sys.stderr)
+    if written != len(modules):
+        sys.exit("short modules golden file")
 
 
 if __name__ == "__main__":
