@@ -17,8 +17,8 @@
 // verb ending comes last and keeps it: (dar-).te-.EI.
 //
 // References: Cunha & Cintra (1984), "Acentuação", and "Monossílabos átonos"
-// (pp. 56-57, as quoted in Ciberdúvidas answer 35988); Acordo Ortográfico (1990),
-// Bases VIII-XI, Base IX 9.º (pelo(s), pela(s) are proclitic), Base XIII 1.º and
+// (pp. 56-57, as quoted in Ciberdúvidas answer 35988; the edition itself was not
+// consulted); Acordo Ortográfico (1990), Bases VIII-XI, Base IX 9.º (pelo(s), pela(s) are proclitic), Base XIII 1.º and
 // Base XVII 1.º (the hyphen of enclisis and tmesis).
 #include <array>
 
