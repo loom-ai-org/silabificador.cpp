@@ -58,11 +58,35 @@ int main() {
     expect(sb::phonotactics::has_foreign_mark("casa"), false, "has_foreign_mark(casa)");
     expect(sb::phonotactics::is_foreign_tetragraph("tsch"), true, "is_foreign_tetragraph(tsch)");
     expect(sb::phonotactics::is_foreign_digraph("ff"), false, "ff is not a foreign digraph");
+    expect(sb::phonotactics::is_ao_diphthong_word("aos"), true, "is_ao_diphthong_word(aos)");
+    expect(sb::phonotactics::is_ao_diphthong_word("caos"), false, "is_ao_diphthong_word(caos)");
+
+    expect(sb::syllabify("saiu-se"), Strings{"sa", "iu-", "se"}, "an enclitic ends the verb");
+    expect(sb::syllabify("saiu de casa"), Strings{"sa", "iu ", "de ", "ca", "sa"}, "a space ends the verb");
+    expect(sb::syllabify("beaux-arts"), Strings{"beaux-", "arts"}, "eau before a final x of an element");
+    expect(sb::syllabify("pau-d'água"), Strings{"pau-", "d'á", "gua"}, "the elided d is an onset");
+    expect(sb::syllabify("sant'ana"), Strings{"san", "t'a", "na"}, "the elided t is an onset");
+    expect(sb::analyze("pau-d'água")[1].onset, std::string("d"), "the onset holds no apostrophe");
+    expect(sb::syllabify("ao pé"), Strings{"ao ", "pé"}, "CONTRACTION-AO");
+    expect(sb::syllabify("aos poucos"), Strings{"aos ", "pou", "cos"}, "CONTRACTION-AO plural");
+    expect(sb::syllabify("aorta"), Strings{"a", "or", "ta"}, "ao inside a word is a hiatus");
+    expect(sb::syllabify("d'aos"), Strings{"d'a", "os"}, "an apostrophe does not end the word");
 
     expect(sb::stressed_index(""), 0, "an empty word returns 0");
     expect(sb::stressed_index("computador"), 3, "computador stress");
     expect(sb::stressed_index("casa"), 0, "casa stress");
     expect(sb::stressed_index("sílaba"), 0, "sílaba stress");
+
+    expect(sb::stressed_index("vendeu-se"), 1, "an enclitic leaves the stress on the verb");
+    expect(sb::stressed_index("deu-te-lo"), 0, "a chain of enclitics is skipped");
+    expect(sb::stressed_index("no-lo"), 1, "a form of pronouns only keeps the last");
+    expect(sb::stressed_index("dar-te-ei"), 2, "in tmesis the verb ending keeps the primary");
+    expect(sb::stressed_index("pelos campos"), 2, "pelos is unstressed");
+    expect(sb::stressed_index("frei luís"), 2, "frei is unstressed");
+    expect(sb::stress::stressed_index({"re", "ve", "lou-", "m'o"}, "revelou-m'o"), 2,
+           "stress::stressed_index skips an elided pronoun");
+    expect(sb::stress::stressed_index({"pé-", "d'a", "lho"}, "pé-d'alho"), 1,
+           "an apostrophe does not split an element");
 
     const auto compound = sb::analyze("guarda-chuva");
     expect(compound[0].secondary, true, "guarda-chuva secondary stress");

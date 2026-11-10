@@ -18,11 +18,15 @@ for (const auto& s : silabificador::analyze("quadro")) {
 The engine works in layers:
 
 - Spelling becomes grapheme units, and each digraph is decided in context.
-- Vowel runs become nuclei and glides.
+- Vowel runs become nuclei and glides. The contractions ao and aos are one
+  syllable; ao inside a word is two (a.or.ta).
 - Consonants are placed by onset maximization, limited by the onset inventory.
 - Prefix, suffix and stem boundaries override that placement. The stems whose
   boundaries no rule reaches are in `data/stems.csv`, which the library embeds.
-- Stress is read from the accents and the ending.
+- An apostrophe marks an elided vowel, so the consonant before it starts the
+  next syllable (pau-.d'á.gua). A hyphen or a space ends a word.
+- Stress is read from the accents and the ending. Unstressed words and enclitic
+  pronouns carry none, so the verb keeps the stress (ven.DEU-.se).
 - A second nucleus pass reads the stress: a stressed final iu or ui after a vowel
   is the diphthong (flu.iu), and an unstressed iu is two nuclei (mi.u.de.za).
 

@@ -17,7 +17,7 @@ namespace silabificador {
 size_t code_points(std::string_view text);
 
 // The Python release this port is held at byte parity with.
-inline constexpr const char* kPythonReference = "2.1.7a1";
+inline constexpr const char* kPythonReference = "2.1.11a1";
 
 // One syllable, decomposed into onset, nucleus (with glides) and coda.
 //
@@ -76,6 +76,8 @@ bool has_foreign_mark(std::string_view word);
 bool is_complex_onset(std::string_view cluster);
 bool is_hiatus_before(std::string_view unit);
 bool is_hiatus_coda(std::string_view unit);
+// The contractions ao and aos, the only words whose ao is a diphthong.
+bool is_ao_diphthong_word(std::string_view word);
 }  // namespace phonotactics
 
 // Layer 1: orthography to grapheme units.

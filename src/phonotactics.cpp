@@ -38,6 +38,10 @@ bool is_foreign_digraph(std::string_view unit) { return one_of(unit, {"sh", "th"
 // German tsch, one affricate [tʃ]: ku.bi.tschek, pu.tschis.ta.
 bool is_foreign_tetragraph(std::string_view unit) { return unit == "tsch"; }
 bool is_hiatus_before(std::string_view unit) { return unit == "nh"; }
+// AO90 Base VII 1 Obs. admits the diphthong ao only "nas combinações da
+// preposição a com as formas masculinas do artigo ou pronome demonstrativo o,
+// ou seja, ao e aos". Elsewhere ao keeps the hiatus: a.or.ta, a.o.ris.to.
+bool is_ao_diphthong_word(std::string_view word) { return word == "ao" || word == "aos"; }
 bool is_hiatus_coda(std::string_view unit) { return single_in(unit, kHiatusCodas); }
 
 bool has_foreign_mark(std::string_view word) { return has_foreign_mark(detail::from_utf8(word)); }

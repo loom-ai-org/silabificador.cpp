@@ -4,6 +4,9 @@
 //   PRE-PALATAL                a close vowel before nh is a nucleus: ra.i.nha,
 //                              mã.i.nha (AO90 Base X 2), so it outranks the next rule
 //   NASAL-OFFGLIDE             a nasal nucleus takes an offglide: mãe, pão, põe
+//   CONTRACTION-AO             the o of the contractions ao and aos is an offglide
+//                              (AO90 Base VII 1 Obs.); a hyphen or a space ends
+//                              the word, an apostrophe does not
 //   ACCENT                     an accented close vowel is a nucleus: pa.ís
 //   IDENTICAL-VOWELS           two identical vowels are two nuclei: xi.i.ta
 //                              (AO90 Base XX 4, "mesmo que sejam iguais")
@@ -15,7 +18,9 @@
 // the stress module has read it:
 //   STRESSED-IU-UI  a stressed final iu or ui after another vowel is the diphthong,
 //                   and the vowel before it stands alone: flu.iu, dis.tra.iu, pa.uis
-//                   (AO90 Base X 6, Base XX 4 "flu-iu")
+//                   (AO90 Base X 6, Base XX 4 "flu-iu"). "Final" means final in
+//                   its own word: the scan stops at a separator, so the enclitic
+//                   of saiu-se does not hide the end of the verb (Base XVII 1)
 //   UNSTRESSED-IU   iu outside the stressed syllable is two nuclei: mi.u.de.za
 //                   (Mateus & d'Andrade 1998, pp. 18-21); ui keeps its diphthong
 #include <algorithm>
@@ -50,6 +55,22 @@ U32 next_unit(const std::vector<Unit>& units, int run_end) {
 bool single_in(const U32& text, std::u32string_view set) {
     return text.size() == 1 && contains(set, text[0]);
 }
+
+// The word that holds units[index], ended by a hyphen or a space. The slices
+// follow Python, so a negative index counts from the end.
+U32 word_at(const std::vector<Unit>& units, int index) {
+    const auto ends_word = [](const Unit& unit) {
+        return unit.is_separator() && !in_apostrophes(unit.text);
+    };
+    const size_t at = py_bound(index, units.size());
+    size_t first = at;
+    while (first > 0 && !ends_word(units[first - 1])) --first;
+    size_t last = at;
+    while (last < units.size() && !ends_word(units[last])) ++last;
+    U32 word;
+    for (size_t k = first; k < last; ++k) word += units[k].text;
+    return word;
+}
 }  // namespace
 
 std::vector<nucleus::Group> resolve(const std::vector<Unit>& units, int start, int end) {
@@ -72,6 +93,9 @@ std::vector<nucleus::Group> resolve(const std::vector<Unit>& units, int start, i
                        // Python's `glide in "eoiu"` is a substring test, true for "" too.
                        std::u32string_view(U"eoiu").find(glide) != std::u32string_view::npos) {
                 group.push_back(i + 1);  // NASAL-OFFGLIDE: mãe, pão, põe
+            } else if (head + glide == U"ao" &&
+                       phonotactics::is_ao_diphthong_word(to_utf8(word_at(units, i)))) {
+                group.push_back(i + 1);  // CONTRACTION-AO: ao, aos
             } else if (!single_in(glide, phonotactics::kGlideCapable) ||
                        single_in(glide, phonotactics::kStressMarked)) {
                 // ACCENT / no mid or low glides: pa.ís, co.e.lho, su.a
@@ -103,8 +127,10 @@ std::vector<nucleus::Group> by_stress(const std::vector<Unit>& units,
         const bool has_previous = !regrouped.empty();
         const U32 glide = head != 0 ? py_at(units, head - 1L).text : U"";
 
+        // Every unit after the head, up to a separator, is an s.
         const auto only_s_after = [&] {
-            for (size_t i = py_bound(head + 1L, units.size()); i < units.size(); ++i) {
+            for (size_t i = py_bound(head + 1L, units.size());
+                 i < units.size() && !units[i].is_separator(); ++i) {
                 if (units[i].text != U"s") return false;
             }
             return true;

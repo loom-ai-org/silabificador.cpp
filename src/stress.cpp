@@ -11,10 +11,16 @@
 // monosyllables (articles, prepositions, conjunctions, clitic pronouns) are not
 // stress domains. A pre-1990 grave (sòmente) marks a secondary stress outright.
 //
-// References: Cunha & Cintra (1984), "Acentuação" and "Monossílabos átonos";
-// Acordo Ortográfico (1990), Bases VIII-XI and Base XIII 1.º.
+// A pronoun joined by a hyphen to the verb before it is an enclitic, not the
+// last word of a compound (AO90 Base XVII 1: amá-lo, dá-se, deixa-o). It has no
+// stress, so the verb keeps the primary: ven.DEU-.se, DEU-.te-.lo. In tmesis the
+// verb ending comes last and keeps it: (dar-).te-.EI.
+//
+// References: Cunha & Cintra (1984), "Acentuação", and "Monossílabos átonos"
+// (pp. 56-57, as quoted in Ciberdúvidas answer 35988); Acordo Ortográfico (1990),
+// Bases VIII-XI, Base IX 9.º (pelo(s), pela(s) are proclitic), Base XIII 1.º and
+// Base XVII 1.º (the hyphen of enclisis and tmesis).
 #include <array>
-#include <stdexcept>
 
 #include "detail.hpp"
 
@@ -28,6 +34,9 @@ constexpr std::u32string_view kTilde = U"ãõ";
 constexpr std::u32string_view kSecondaryAccents = U"èìòù";
 // Characters that join words without belonging to one.
 constexpr std::u32string_view kSeparators = U"- '’";
+// The separators that end a word. An apostrophe does not: it marks an elided
+// vowel (AO90 Base XVIII), so pau-d'alho has two elements, pau and dalho.
+constexpr std::u32string_view kWordBoundaries = U"- ";
 
 constexpr std::array<std::u32string_view, 18> kOxytoneEndings{
     U"r", U"l", U"z", U"x", U"n", U"ps", U"i", U"is", U"u", U"us",
@@ -38,21 +47,38 @@ constexpr std::array<std::u32string_view, 6> kParoxytoneEndings{
     U"as", U"es", U"os", U"am", U"em", U"ens",
 };
 
-// The monossílabos átonos: a closed class of function words with no stress.
-constexpr std::array<std::u32string_view, 38> kClitics{
-    U"a", U"as", U"o", U"os", U"um", U"uns", U"uma", U"umas",
-    U"de", U"do", U"da", U"dos", U"das", U"d", U"em", U"no", U"na",
-    U"nos", U"nas", U"por", U"pelo", U"pela", U"com", U"sem", U"a o",
-    U"e", U"ou", U"que", U"se", U"mas", U"nem",
-    U"me", U"te", U"lhe", U"lhes", U"vos", U"lo", U"la",
+// The clitic pronouns: Cunha & Cintra's "me, te, se, o, a, lhe, nos, vos, os,
+// as, lhes e suas combinações: mo, to, lho"; lo(s), la(s) (AO90 Base VIII 1 b);
+// no, na, nos, nas after a nasal (fazem-no); and the vo of vo-lo.
+constexpr std::array<std::u32string_view, 31> kCliticPronouns{
+    U"me", U"te", U"se", U"lhe", U"nos", U"vos", U"lhes", U"o", U"a", U"os", U"as",
+    U"mo", U"ma", U"mos", U"mas", U"to", U"ta", U"tos", U"tas", U"lho", U"lha", U"lhos", U"lhas",
+    U"lo", U"la", U"los", U"las", U"no", U"na", U"nas", U"vo",
 };
 
-bool is_clitic(std::u32string_view element) {
-    for (auto c : kClitics) {
-        if (c == element) return true;
+// The monossílabos átonos: a closed class of function words with no stress,
+// the clitic pronouns above included. pelo(s) and pela(s) are two syllables
+// and AO90 Base IX 9.º names them proclitic. dom, são, seu and sob are left
+// out: the stressed reading is common, or a prefix would lose its stress.
+constexpr std::array<std::u32string_view, 41> kClitics{
+    U"a", U"as", U"o", U"os", U"um", U"uns", U"uma", U"umas",
+    U"de", U"do", U"da", U"dos", U"das", U"d", U"em", U"no", U"na",
+    U"nos", U"nas", U"por", U"pelo", U"pela", U"com", U"sem",
+    U"à", U"às", U"ao", U"aos", U"dum", U"duns", U"num", U"nuns", U"pelos", U"pelas",
+    U"e", U"ou", U"que", U"se", U"mas", U"nem",
+    U"frei",
+};
+
+template <size_t N>
+bool one_of(std::u32string_view element, const std::array<std::u32string_view, N>& words) {
+    for (auto word : words) {
+        if (word == element) return true;
     }
     return false;
 }
+
+bool is_pronoun(std::u32string_view element) { return one_of(element, kCliticPronouns); }
+bool is_clitic(std::u32string_view element) { return is_pronoun(element) || one_of(element, kClitics); }
 
 template <size_t N>
 bool ends_with_any(std::u32string_view word, const std::array<std::u32string_view, N>& endings) {
@@ -69,10 +95,14 @@ bool has_any(std::u32string_view text, std::u32string_view set) {
     return false;
 }
 
-// Python's `s[-1:] in "- '’"`: substring test, so an empty string matches.
+// Python's `s.rstrip(APOSTROPHES)[-1:] in "- "`: a substring test, so an empty
+// remainder matches. An apostrophe after the hyphen does not change the end of
+// the element: bê-.á-'.bá.
 bool ends_element(std::u32string_view syllable) {
-    if (syllable.empty()) return true;
-    return contains(kSeparators, syllable.back()) || contains(syllable, U' ');
+    size_t end = syllable.size();
+    while (end > 0 && contains(kApostrophes, syllable[end - 1])) --end;
+    if (end == 0) return true;
+    return contains(kWordBoundaries, syllable[end - 1]) || contains(syllable, U' ');
 }
 
 U32 rstrip_separators(std::u32string_view text) {
@@ -81,15 +111,16 @@ U32 rstrip_separators(std::u32string_view text) {
     return U32(text.substr(0, end));
 }
 
-// The words inside a compound, in order: guarda-chuva is two, chapéu de chuva three.
+// The words inside a compound, in order: guarda-chuva is two, chapéu de chuva
+// three. An element is spelled without its apostrophes, so d'os is dos.
 std::vector<U32> elements(const U32& word) {
     std::vector<U32> parts;
     U32 current;
     for (char32_t c : word) {
-        if (contains(kSeparators, c)) {
+        if (contains(kWordBoundaries, c)) {
             if (!current.empty()) parts.push_back(current);
             current.clear();
-        } else {
+        } else if (!contains(kApostrophes, c)) {
             current.push_back(c);
         }
     }
@@ -108,6 +139,20 @@ std::vector<std::vector<int>> element_groups(const std::vector<U32>& syllables) 
         if (!g.empty()) nonempty.push_back(std::move(g));
     }
     return nonempty;
+}
+
+// Position of the element that carries the primary stress: the last one,
+// unless it is a pronoun hyphenated to the word before it. An enclitic has no
+// stress, so the primary falls on its host, and a chain of them is skipped
+// whole (deu-te-lo). A form made only of pronouns (no-lo) keeps it on the last.
+size_t primary_element(const std::vector<U32>& syllables, const std::vector<std::vector<int>>& groups,
+                       const std::vector<U32>& words) {
+    long host = static_cast<long>(words.size()) - 1;
+    while (host != 0 && is_pronoun(py_at(words, host)) &&
+           ends_with(syllables[groups[host - 1].back()], U"-")) {
+        --host;
+    }
+    return is_pronoun(py_at(words, host)) ? words.size() - 1 : static_cast<size_t>(host);
 }
 
 // Index of the stressed syllable of a single word, not a compound.
@@ -148,15 +193,15 @@ std::vector<Syllable> assign(const std::vector<Syllable>& syllables, const U32& 
     }
 
     std::set<int> primary, secondary;
-    const size_t last = groups.size() - 1;
+    const size_t host = primary_element(surfaces, groups, words);
     for (size_t position = 0; position < groups.size(); ++position) {
         const auto& group = groups[position];
         const U32& element = words[position];
-        if (position != last && (element.empty() || is_clitic(element))) continue;
+        if (position != host && (element.empty() || is_clitic(element))) continue;
         std::vector<U32> local;
         for (int i : group) local.push_back(rstrip_separators(surfaces[i]));
         const int target = group[stressed_in(local, element)];
-        (position == last ? primary : secondary).insert(target);
+        (position == host ? primary : secondary).insert(target);
     }
 
     // The pre-1990 grave states a secondary stress outright, wherever it falls.
@@ -182,12 +227,13 @@ int stressed_index(const std::vector<U32>& syllables, const U32& word) {
         for (const auto& s : syllables) stripped.push_back(rstrip_separators(s));
         return stressed_in(stripped, word);
     }
-    if (groups.empty()) throw std::out_of_range("stressed_index: no syllables");
-
-    const auto& group = groups.back();
+    // With no syllables and no words, primary_element raises as Python's
+    // words[-1] does.
+    const size_t host = primary_element(syllables, groups, words);
+    const auto& group = groups[host];
     std::vector<U32> local;
     for (int i : group) local.push_back(rstrip_separators(syllables[i]));
-    return group[stressed_in(local, words.back())];
+    return group[stressed_in(local, words[host])];
 }
 
 }  // namespace detail
