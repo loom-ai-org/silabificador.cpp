@@ -7,7 +7,7 @@ the bytes.
 
 ## Public surface
 
-The Python package 2.1.11a1 defines 47 public names across its nine modules, counting
+The Python package 2.1.14a1 defines 47 public names across its nine modules, counting
 each re-export once and leaving out the version constants. All 47 are ported: 47 public
 symbols, 47 ported. Each one maps to C++ as shown below.
 The rule tables are data, so they are kept internal in C++. They are reached
@@ -48,7 +48,7 @@ The Python package has no command-line interface, so this library ships none.
 ## Data
 
 `data/stems.csv` is the Python package's `silabificador/data/stems.csv`, copied byte for
-byte from the 2.1.11a1 wheel. CMake embeds it in the library when the project is
+byte from the 2.1.14a1 wheel. CMake embeds it in the library when the project is
 configured, so an installed library reads no file at run time. The library parses it as
 Python's `csv.DictReader` does and reads the `stem` and `split` columns. To change the
 stems, replace the file with the one from the new Python release and configure again.
@@ -76,18 +76,18 @@ input.
 | Corpus | Inputs | Source |
 | --- | ---: | --- |
 | gold_sample | 500 | silabificador `tests/gold_sample.json` |
-| tests | 632 | every string literal in silabificador `tests/` |
-| edge_cases | 111 | every word of silabificador `tests/edge_cases.json` not already listed |
-| lexicon | 52,642 | every distinct word of tugalex 2.3.0a1 `regional_dict.csv.gz` not already listed |
+| tests | 671 | every string literal in silabificador `tests/` |
+| edge_cases | 116 | every word of silabificador `tests/edge_cases.json` not already listed |
+| lexicon | 52,635 | every distinct word of tugalex 2.3.0a1 `regional_dict.csv.gz` not already listed |
 | gold_tsv | 1,200 | tugaphone `tests/data/gold/*.tsv` words not already listed |
-| rules | 31,676 | every rule-table entry in context: clitics in compounds, each ending, each prefix and stem with inflections, each listed stem inside derivatives, each digraph, tetragraph and onset, every vowel pair with each coda, the loanword vowels with each foreign mark, the trema, the -idade nouns, and three-vowel runs ending in iu or ui |
-| fuzz | 25,616 | seeded random strings over letters, accents, separators, digits, whitespace and Greek |
+| rules | 31,674 | every rule-table entry in context: clitics in compounds, each ending, each prefix and stem with inflections, each listed stem inside derivatives, each digraph, tetragraph and onset, every vowel pair with each coda, the loanword vowels with each foreign mark, the trema, the -idade nouns, and three-vowel runs ending in iu or ui |
+| fuzz | 25,615 | seeded random strings over letters, accents, separators, digits, whitespace and Greek |
 | unicode | 6,902 | every code point with a lowercase mapping, whitespace status, or category Mn/Lt, plus the final-sigma contexts |
 | clitics | 1,229 | every unstressed word of `stress.CLITICS` before and after a word, as an enclitic, in a mesoclitic, and after an apostrophe |
 | enclitics | 25,241 | each clitic pronoun after sampled infinitives and preterites, `-lo` forms, `-no`/`-na` after a nasal, mesoclitic futures and conditionals, and every base word that ends in a vowel and `iu` or `ui`, before a separator |
 | contractions | 12,000 | `ao` and `aos` before, after and between sampled words, joined by a space, a hyphen or an apostrophe |
-| elisions | 10,230 | `d'`, `n'` and `sant'` with `'` and U+2019 before and after sampled words |
-| phrases | 81 | compounds, contractions, elisions and enclitic phrases written by hand |
+| elisions | 10,236 | `d'`, `n'` and `sant'` with `'` and U+2019 before and after sampled words |
+| phrases | 80 | compounds, contractions, elisions and enclitic phrases written by hand |
 | pairs | 25,000 | seeded pairs of words joined by a hyphen, a space or an apostrophe, and chains with a clitic pronoun between them |
 
 The phrase corpora take their base words from the corpora above that hold no separator,

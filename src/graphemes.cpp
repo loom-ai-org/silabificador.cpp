@@ -45,7 +45,10 @@ std::u32string_view foreign_vowel(const U32& word, size_t index) {
         const std::u32string_view tail = rest.substr(2);
         if (tail == U"r" || tail == U"rs") return U"eu";
     }
-    if (starts_with(rest, U"ou") && phonotactics::has_foreign_mark(word)) return U"ou";
+    if (rest == U"eei" || rest == U"eeis" || rest == U"eemos" || rest == U"eemo") return U"";
+    const std::u32string_view head = rest.substr(0, 2);
+    if ((head == U"ou" || head == U"oo" || head == U"ee") && phonotactics::has_foreign_mark(word))
+        return head;
     return U"";
 }
 }  // namespace
