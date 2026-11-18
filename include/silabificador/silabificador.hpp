@@ -17,7 +17,7 @@ namespace silabificador {
 size_t code_points(std::string_view text);
 
 // The Python release this port is held at byte parity with.
-inline constexpr const char* kPythonReference = "2.1.11a1";
+inline constexpr const char* kPythonReference = "2.1.14a1";
 
 // One syllable, decomposed into onset, nucleus (with glides) and coda.
 //
